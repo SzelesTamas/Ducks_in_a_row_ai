@@ -62,6 +62,12 @@ class Node:
                 return True
         return False
 
+    def detachFromParent(self):
+        """Detaches the node from it's parent."""
+        if self.parent is not None:
+            self.parent.children[self.resultingMove] = None
+            self.parent = None
+
     def addGames(self, wins, visits):
         """Adds the number of wins and the number of visits to the node.
 
