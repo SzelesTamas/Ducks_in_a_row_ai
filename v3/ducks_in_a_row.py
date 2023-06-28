@@ -1,4 +1,4 @@
-"""This is a modul for implementing the ducks in a row game as an environment for the RL agent."""
+"""This is a module for implementing the ducks in a row game as an environment for the RL agent."""
 import numpy as np
 
 
@@ -192,3 +192,40 @@ class Board:
             np.array: State as -1s for the opponent and 1s for the player, 0s for the empty space.
         """
         return np.where(state == player, 1, np.where(state == 0, 0, -1))
+
+    def moveFromIndex(index: int):
+        """Returns the move from the index in the format (x0, y0, x1, y1).
+
+        Args:
+            index (int): The index of the move.
+
+        Returns:
+            tuple: The move in the format (x0, y0, x1, y1).
+        """
+        # get the starting square
+        startInd = index // 25
+        startX = startInd // 5
+        startY = startInd % 5
+        moves = [(-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1)]
+        # 0 1 2
+        # 7   3
+        # 6 5 4
+        endX = startX + moves[index % 25][0]
+        endY = startY + moves[index % 25][1]
+        return (startX, startY, endX, endY)
+    
+    def indexFromMove(move: tuple):
+        """Returns the index from the move.
+
+        Args:
+            move (tuple): The move in the format (x0, y0, x1, y1).
+
+        Returns:
+            int: The index of the move.
+        """
+        startX, startY, endX, endY = move
+        moves = [(-1, -1), (-1, 0), (-1, 1), (0, 1), 
+                 (1, 1), (1, 0), (1, -1), (0, -1)]
+        startInd = startX * 5 + startY
+        endInd = moves.index((endX - startX, endY - startY))
+        return startInd * 25 + endInd
