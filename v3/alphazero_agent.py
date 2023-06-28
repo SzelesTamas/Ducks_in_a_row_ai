@@ -31,14 +31,19 @@ class Node:
         self.endNode = endNode
         self.parent = parent
         self.resultingMove = resultingMove
+        
+        self.nnValue = 0
+        self.nnProbabilities = np.zeros(200)
 
-    def addChild(self, child):
+    def addChild(self, child, moveProbability):
         """Adds a child to the node.
 
         Args:
             child (Node): The child node.
+            moveProbability (float): The probability of the move that led to the child.
         """
-        self.children.append(child)
+        self.nnProbabilities[child.resultingMove] = moveProbability
+        self.children[child.resultingMove] = child
         child.parent = self
         self.wins += child.wins
         self.visits += child.visits
@@ -70,9 +75,12 @@ class Node:
     def deleteAllChildren(self):
         """Deletes all the children of the node recursively."""
 
-        while len(self.children) > 0:
-            child = self.children.pop()
-            child.deleteAllChildren()
+        for i in range(len(self.children)):
+            if(self.children[i] is None):
+                continue
+            self.children[i].deleteAllChildren()
+            del self.children[i]
+            self.children[i] = None
 
     def copy(self):
         """Returns a copy of the node.
@@ -84,6 +92,10 @@ class Node:
         copy.wins = self.wins
         copy.visits = self.visits
         copy.resultingMove = self.resultingMove
+        
+        copy.children = self.children.copy()
+        copy.nnValue = self.nnValue
+        copy.nnProbabilities = self.nnProbabilities.copy()
         return copy
 
 class AlphaZeroAgent:
