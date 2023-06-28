@@ -1,0 +1,2 @@
+This is an implementation of the vanilla Monte Carlo Tree Search algorithm applied to the game Ducks in a row.
+It sometimes plays reasonable moves, but other times it doesn't. I've experimented with the "hyperparameters" quite a lot and I couldn't get it beat me. I don't know if it is because it runs only a single thread or something is wrong with the implementation or the basic Monte Carlo Tree Search is not capable of beating a human in reasonable time limits.
