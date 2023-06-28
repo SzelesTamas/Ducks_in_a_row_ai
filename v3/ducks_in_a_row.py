@@ -1,5 +1,6 @@
 """This is a module for implementing the ducks in a row game as an environment for the RL agent."""
 import numpy as np
+import random
 
 
 class Board:
@@ -167,6 +168,19 @@ class Board:
                             validMoves.append((x0, y0, nextX, nextY))
         return validMoves
 
+    def getRandomMove(state, player):
+        """Returns a random move for the given player.
+
+        Args:
+            state (np.array): The state we want to evaluate.
+            player (int): The index of the player.
+
+        Returns:
+            tuple: (x0, y0, x1, y1) where (x0, y0) is the starting position and (x1, y1) is the ending position.
+        """
+        validMoves = Board.getValidMoves(state, player)
+        return random.choice(validMoves)
+
     def getAllNextStates(state, player):
         """Returns all the possible next states for the given player.
 
@@ -213,7 +227,7 @@ class Board:
         endX = startX + moves[index % 25][0]
         endY = startY + moves[index % 25][1]
         return (startX, startY, endX, endY)
-    
+
     def indexFromMove(move: tuple):
         """Returns the index from the move.
 
@@ -224,8 +238,7 @@ class Board:
             int: The index of the move.
         """
         startX, startY, endX, endY = move
-        moves = [(-1, -1), (-1, 0), (-1, 1), (0, 1), 
-                 (1, 1), (1, 0), (1, -1), (0, -1)]
+        moves = [(-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1)]
         startInd = startX * 5 + startY
         endInd = moves.index((endX - startX, endY - startY))
         return startInd * 25 + endInd
