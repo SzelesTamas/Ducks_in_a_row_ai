@@ -13,12 +13,22 @@ from math import sqrt
 class Game:
     """This is a class for managing the MCTS Agent and creating a GUI."""
 
-    def __init__(self, screen, agentInd: int = 2):
+    def __init__(
+        self,
+        screen,
+        agentInd: int = 2,
+        simulationCount: int = 1000,
+        valueNetworkPath: str = None,
+        policyNetworkPath: str = None,
+    ):
         """Initializes the Game class.
 
         Args:
             screen (Any): Pygame display to draw the game on.
             agentInd (int): The index of the MCTS Agent.
+            simulationCount (int, optional): The number of simulations the MCTS Agent will run. Defaults to 1000.
+            valueNetworkPath (str, optional): Path to the value network. Defaults to None.
+            policyNetworkPath (str, optional): Path to the policy network. Defaults to None.
         """
 
         # GUI parameters
@@ -37,7 +47,14 @@ class Game:
         # game parameteres
         self.board = Board()
         self.agentInd = agentInd
-        self.agent = AlphaZeroAgent(self.board, agentInd, 1.4, simulationCount=1000)
+        self.agent = AlphaZeroAgent(
+            self.board,
+            agentInd,
+            1.4,
+            simulationCount=simulationCount,
+            valueNetworkPath=valueNetworkPath,
+            policyNetworkPath=policyNetworkPath,
+        )
 
     def drawBoard(self):
         """Draws the board on the screen."""
@@ -238,6 +255,6 @@ if __name__ == "__main__":
     pygame.init()
     pygame.font.init()
     screen = pygame.display.set_mode((500, 500))
-    game = Game(screen=screen, agentInd=2)
-    print("starting new game...")
+    game = Game(screen=screen, agentInd=2, simulationCount=500)
+    print("Game started!")
     game.startGame()
