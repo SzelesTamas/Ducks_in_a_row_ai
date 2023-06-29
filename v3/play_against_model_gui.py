@@ -1,7 +1,7 @@
 """When running this file the user can play against a vanilla Monte Carlo Tree Search a match of Ducks in a row."""
 from typing import Any, Literal
 from ducks_in_a_row import Board
-from mcts_vanilla_agent import VanillaMCTS
+from alphazero_agent import AlphaZeroAgent
 import os
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
@@ -37,13 +37,7 @@ class Game:
         # game parameteres
         self.board = Board()
         self.agentInd = agentInd
-        self.agent = VanillaMCTS(
-            self.board,
-            self.agentInd,
-            rolloutLength=0.1,
-            maxSimulationCount=10000,
-            explorationParameter=1.4,
-        )
+        self.agent = AlphaZeroAgent(self.board, agentInd, 1.4, simulationCount=1000)
 
     def drawBoard(self):
         """Draws the board on the screen."""
@@ -219,7 +213,7 @@ class Game:
                 if self.board.onTurn == self.agentInd:
                     # agents turn
                     print("Agent is thinking...")
-                    move = self.agent.getBestMove()
+                    move = self.agent.getMove(self.board.state)
                     self.board.makeMove(move)
                 else:
                     # human turn

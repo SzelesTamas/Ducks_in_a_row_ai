@@ -33,8 +33,8 @@ class PolicyNetwork(nn.Module):
 
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.flatten = nn.Flatten()
-        if modelPath is not None:
+        self.flatten = torch.flatten
+        if modelPath is None:
             self.model = nn.Sequential(
                 nn.Linear(inputSize, hiddenSize),
                 nn.Tanh(),
@@ -53,8 +53,9 @@ class PolicyNetwork(nn.Module):
         Returns:
             torch.Tensor: The output tensor.
         """
+        x = torch.tensor(x).float()
         x = x.to(self.device)
-        x = self.flatten(x)
+        x = self.flatten(x).reshape(1, -1)
         return self.model(x)
 
     def save(self, path):
@@ -89,8 +90,8 @@ class ValueNetwork(nn.Module):
 
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.flatten = nn.Flatten()
-        if modelPath is not None:
+        self.flatten = torch.flatten
+        if modelPath is None:
             self.model = nn.Sequential(
                 nn.Linear(inputSize, hiddenSize),
                 nn.Tanh(),
@@ -109,8 +110,9 @@ class ValueNetwork(nn.Module):
         Returns:
             torch.Tensor: The output tensor.
         """
+        x = torch.tensor(x).float()
         x = x.to(self.device)
-        x = self.flatten(x)
+        x = self.flatten(x).reshape(1, -1)
         return self.model(x)
 
     def save(self, path):

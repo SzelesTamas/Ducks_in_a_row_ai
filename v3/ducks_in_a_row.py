@@ -151,6 +151,11 @@ class Board:
         Returns:
             list: All valid moves for the given player.
         """
+        # check if the game is over or not
+        winner = Board.getWinner(state)
+        if(winner != 0):
+            return []
+        
         xMoves = [-1, -1, -1, 0, 1, 1, 1, 0]
         yMoves = [-1, 0, 1, 1, 1, 0, -1, -1]
         moves = list(zip(xMoves, yMoves))
@@ -179,6 +184,8 @@ class Board:
             tuple: (x0, y0, x1, y1) where (x0, y0) is the starting position and (x1, y1) is the ending position.
         """
         validMoves = Board.getValidMoves(state, player)
+        if(len(validMoves) == 0):
+            return []
         return random.choice(validMoves)
 
     def getAllNextStates(state, player):
@@ -217,15 +224,15 @@ class Board:
             tuple: The move in the format (x0, y0, x1, y1).
         """
         # get the starting square
-        startInd = index // 25
+        startInd = index // 8
         startX = startInd // 5
         startY = startInd % 5
         moves = [(-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1)]
         # 0 1 2
         # 7   3
         # 6 5 4
-        endX = startX + moves[index % 25][0]
-        endY = startY + moves[index % 25][1]
+        endX = startX + moves[index % 8][0]
+        endY = startY + moves[index % 8][1]
         return (startX, startY, endX, endY)
 
     def indexFromMove(move: tuple):
@@ -241,4 +248,4 @@ class Board:
         moves = [(-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1)]
         startInd = startX * 5 + startY
         endInd = moves.index((endX - startX, endY - startY))
-        return startInd * 25 + endInd
+        return startInd * 8 + endInd
