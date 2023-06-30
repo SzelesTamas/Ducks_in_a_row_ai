@@ -157,7 +157,7 @@ class AlphaZeroAgent:
             state (numpy.array): The state of the environment.
 
         Returns:
-            int: The index of the best move.
+            tuple: (The index of the best move, the policy probabilities for the given state)
         """
         
         # If the root node is not initialized, initialize it
@@ -189,19 +189,26 @@ class AlphaZeroAgent:
         # Monte Carlo Tree Search
         # In the previous version I've tried the parallelization of the rollouts but it was slower than the sequential version
         for i in range(1, self.simulationCount + 1):
-            self.MCTSSimulation(self.root, simnum=i) # do a full simulation
+            self.MCTSSimulation(self.root) # do a full simulation
             print(f"Finished simulation {i} out of {self.simulationCount}\t\t", end="\r")
         print()    
         
             
         # Get the best move
         # by best we mean the move with the highest number of visits
-        bestNode = None
+        # we sample a probability distribution with the number of visits as weights
+        
+        probs = self.root.nnProbabilities.copy() / np.sum(self.root.nnProbabilities)
+        # the invalid moves should have a probability of 0
+        mask = np.zeros(probs.shape)
         for move in self.root.validMoves:
-            bestNode = max([bestNode, self.root.children[move]], key=lambda x: (-1 if x is None else x.visits))
-        move = Board.moveFromIndex(bestNode.resultingMove)
-        print(f"Best move: {move} with index {bestNode.resultingMove} and {bestNode.visits} visits")
-        return move
+            mask[move] = 1
+        probs *= mask # mask out the invalid moves
+        probs /= np.sum(probs) # renormalize the probabilities
+        
+        move = np.random.choice(np.arange(200), p=probs)
+        
+        return move, probs
         
     def getUCT(self, node):
         """Returns the UCT value of the node according to the AlphaZero formula.
@@ -226,7 +233,7 @@ class AlphaZeroAgent:
         
         return valueScore + priorScore
         
-    def MCTSSimulation(self, root, simnum=0):
+    def MCTSSimulation(self, root):
         """Does a MCTS simulation from the given root node.
         
         Args:

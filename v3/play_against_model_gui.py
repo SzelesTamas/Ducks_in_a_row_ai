@@ -230,7 +230,9 @@ class Game:
                 if self.board.onTurn == self.agentInd:
                     # agents turn
                     print("Agent is thinking...")
-                    move = self.agent.getMove(self.board.state)
+                    move, _ = self.agent.getMove(self.board.state)
+                    print(_)
+                    move = Board.moveFromIndex(move)
                     self.board.makeMove(move)
                 else:
                     # human turn
