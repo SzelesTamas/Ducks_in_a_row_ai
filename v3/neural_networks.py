@@ -55,7 +55,7 @@ class PolicyNetwork(nn.Module):
         """
         x = torch.tensor(x).float()
         x = x.to(self.device)
-        x = self.flatten(x).reshape(1, -1)
+        x = self.flatten(x, 1)
         return self.model(x)
 
     def save(self, path):
@@ -112,7 +112,7 @@ class ValueNetwork(nn.Module):
         """
         x = torch.tensor(x).float()
         x = x.to(self.device)
-        x = self.flatten(x).reshape(1, -1)
+        x = self.flatten(x, 1)
         return self.model(x)
 
     def save(self, path):

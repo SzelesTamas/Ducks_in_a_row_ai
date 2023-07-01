@@ -130,7 +130,6 @@ class AlphaZeroAgent:
 
     def __init__(
         self,
-        env,
         player=1,
         explorationConstant=1.4,
         simulationCount=50,
@@ -142,7 +141,6 @@ class AlphaZeroAgent:
         """Initializes the agent.
 
         Args:
-            env (Board): The environment.
             player (int, optional): The index of the player. Defaults to 1.
             explorationConstant (float, optional): The exploration constant used by the agent. Defaults to 1.4.
             simulationCount (int, optional): The number of simulations to do in the MCTS (number of new nodes in the tree). Defaults to 50.
@@ -152,7 +150,6 @@ class AlphaZeroAgent:
             policyNetwork (PolicyNetwork, optional): The policy neural network. Defaults to None.
         """
         # Initialize the parameters
-        self.env = env
         self.player = player
         self.explorationConstant = explorationConstant
         self.simulationCount = simulationCount
@@ -361,8 +358,8 @@ class AlphaZeroAgent:
         if node.endNode:
             return (1 if Board.getWinner(node.state) == node.player else -1), None
 
-        input = Board.getStateForPlayer(node.state, node.player)
+        input = np.array([Board.getStateForPlayer(node.state, node.player)])
         value = self.valueNetwork(input)
         policy = self.policyNetwork(input)
 
-        return value.detach().numpy()[0][0], policy.detach().numpy()[0]
+        return value.detach().cpu().numpy()[0][0], policy.detach().cpu().numpy()[0]

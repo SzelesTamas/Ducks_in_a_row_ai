@@ -48,7 +48,6 @@ class Game:
         self.board = Board()
         self.agentInd = agentInd
         self.agent = AlphaZeroAgent(
-            self.board,
             agentInd,
             1.4,
             simulationCount=simulationCount,
@@ -231,9 +230,9 @@ class Game:
                     # agents turn
                     print("Agent is thinking...")
                     move, _ = self.agent.getMove(self.board.state)
-                    print(_)
                     move = Board.moveFromIndex(move)
                     self.board.makeMove(move)
+                    print("Your turn!")
                 else:
                     # human turn
                     if event.type == pygame.MOUSEBUTTONDOWN and not mousePressed:
