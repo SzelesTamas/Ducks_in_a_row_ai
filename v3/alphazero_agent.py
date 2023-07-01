@@ -33,9 +33,12 @@ class Node:
         self.endNode = endNode
         self.parent = parent
         self.resultingMove = resultingMove
-        
-        self.validMoves = [Board.indexFromMove(move) for move in Board.getValidMoves(self.state, self.player)]
-        
+
+        self.validMoves = [
+            Board.indexFromMove(move)
+            for move in Board.getValidMoves(self.state, self.player)
+        ]
+
         self.nnValue = 0
         self.nnProbabilities = np.zeros(200)
 
@@ -45,7 +48,7 @@ class Node:
         Args:
             child (Node): The child node.
         """
-        
+
         self.children[child.resultingMove] = child
         child.parent = self
         self.wins += child.wins
@@ -85,7 +88,7 @@ class Node:
         """Deletes all the children of the node recursively."""
 
         for i in range(len(self.children)):
-            if(self.children[i] is None):
+            if self.children[i] is None:
                 continue
             self.children[i].deleteAllChildren()
             del self.children[i]
@@ -101,7 +104,7 @@ class Node:
         copy.wins = self.wins
         copy.visits = self.visits
         copy.resultingMove = self.resultingMove
-        
+
         copy.children = self.children.copy()
         copy.nnValue = self.nnValue
         copy.nnProbabilities = self.nnProbabilities.copy()
@@ -109,7 +112,7 @@ class Node:
 
     def notFullyExpanded(self):
         """Checks if the node is fully expanded (has any unvisited children).
-        
+
         Returns:
             bool: True if the node is not fully expanded, False otherwise.
         """
@@ -118,13 +121,24 @@ class Node:
                 return True
         return False
 
+
 class AlphaZeroAgent:
     """This is a class for implementing a Alpha Zero like agent for the 'Ducks in a row' game.
     The agent uses Monte Carlo Tree Search and neural networks to play the game.
     It can return the best move for a given state.
     """
-    
-    def __init__(self, env, player=1, explorationConstant=1.4, simulationCount=50, valueNetworkPath=None, policyNetworkPath=None):
+
+    def __init__(
+        self,
+        env,
+        player=1,
+        explorationConstant=1.4,
+        simulationCount=50,
+        valueNetworkPath=None,
+        policyNetworkPath=None,
+        valueNetwork=None,
+        policyNetwork=None,
+    ):
         """Initializes the agent.
 
         Args:
@@ -134,6 +148,8 @@ class AlphaZeroAgent:
             simulationCount (int, optional): The number of simulations to do in the MCTS (number of new nodes in the tree). Defaults to 50.
             valueNetworkPath (str, optional): The path to the value neural network. Defaults to None.
             policyNetworkPath (str, optional): The path to the policy neural network. Defaults to None.
+            valueNetwork (ValueNetwork, optional): The value neural network. Defaults to None.
+            policyNetwork (PolicyNetwork, optional): The policy neural network. Defaults to None.
         """
         # Initialize the parameters
         self.env = env
@@ -142,74 +158,103 @@ class AlphaZeroAgent:
         self.simulationCount = simulationCount
         self.valueNetworkPath = valueNetworkPath
         self.policyNetworkPath = policyNetworkPath
-        
+
         # Initialize the neural networks
-        self.valueNetwork = ValueNetwork(modelPath=valueNetworkPath)
-        self.policyNetwork = PolicyNetwork(modelPath=policyNetworkPath)
-        
+        if valueNetwork is None:
+            self.valueNetwork = ValueNetwork(modelPath=valueNetworkPath)
+        else:
+            self.valueNetwork = valueNetwork
+        if policyNetwork is None:
+            self.policyNetwork = PolicyNetwork(modelPath=policyNetworkPath)
+        else:
+            self.policyNetwork = policyNetwork
+
         # Initialize the root node for the MCTS tree
         self.root = None
-        
-    def getMove(self, state):
+
+    def getMove(self, state, debug=False):
         """Returns the best move for the given state according to the agent.
 
         Args:
             state (numpy.array): The state of the environment.
+            debug (bool, optional): If True, the agent will print some info. Defaults to False.
 
         Returns:
             tuple: (The index of the best move, the policy probabilities for the given state)
         """
-        
+
         # If the root node is not initialized, initialize it
-        if(self.root is None):
-            print("Creating new root")
-            self.root = Node(state, self.player)
+        if self.root is None:
+            if debug:
+                print("Creating new root for starting state")
+            self.root = Node(state.copy(), self.player)
             self.root.nnValue, self.root.nnProbabilities = self.rollout(self.root)
         else:
             # Search the tree for the current state with a BFS to get the root node
             queue = [self.root]
             newRoot = None
-            while(len(queue) > 0):
+            currSize = 1
+            nextSize = 0
+            depth  = 0
+            if(debug):
+                print("Searching for node with state:\n", state)
+                print("Root state:\n", self.root.state)
+            while len(queue) > 0:
                 node = queue.pop(0)
-                if(np.array_equal(node.state, state) and node.player == self.player):
+                if np.array_equal(node.state, state) and node.player == self.player:
                     newRoot = node
                     break
+                currSize -= 1
+                
                 for child in node.children:
-                    if(child is not None):
+                    if child is not None:
                         queue.append(child)
-            
-            if(newRoot is None):
-                print("Creating new root")
-                self.root = Node(state, self.player)
+                        nextSize += 1
+                        
+                if currSize == 0:
+                    depth += 1
+                    currSize, nextSize = nextSize, currSize
+
+            if newRoot is None:
+                if(debug):
+                    print("Creating new root for state---------------------------------------")
+                    print(state)               
+                                   
+                self.root = Node(state.copy(), self.player)
                 self.root.nnValue, self.root.nnProbabilities = self.rollout(self.root)
             else:
                 self.root = newRoot
-                print("Reusing root")
-        
+                if(debug):
+                    print("Reusing root")
+
         # Monte Carlo Tree Search
         # In the previous version I've tried the parallelization of the rollouts but it was slower than the sequential version
         for i in range(1, self.simulationCount + 1):
-            self.MCTSSimulation(self.root) # do a full simulation
-            print(f"Finished simulation {i} out of {self.simulationCount}\t\t", end="\r")
-        print()    
-        
-            
+            self.MCTSSimulation(self.root)  # do a full simulation
+            if debug:
+                print(
+                    f"Finished simulation {i} out of {self.simulationCount}\t\t", end="\r"
+                )
+                
+        if debug:
+            print()
+
         # Get the best move
         # by best we mean the move with the highest number of visits
         # we sample a probability distribution with the number of visits as weights
-        
+
         probs = self.root.nnProbabilities.copy() / np.sum(self.root.nnProbabilities)
         # the invalid moves should have a probability of 0
         mask = np.zeros(probs.shape)
         for move in self.root.validMoves:
             mask[move] = 1
-        probs *= mask # mask out the invalid moves
-        probs /= np.sum(probs) # renormalize the probabilities
-        
+        probs *= mask  # mask out the invalid moves
+        probs /= np.sum(probs)  # renormalize the probabilities
+
         move = np.random.choice(np.arange(200), p=probs)
-        
+
         return move, probs
-        
+
     def getUCT(self, node):
         """Returns the UCT value of the node according to the AlphaZero formula.
 
@@ -219,84 +264,105 @@ class AlphaZeroAgent:
         Returns:
             float: The UCT value of the node.
         """
-        if(node is None):
-            return -float('inf')
-        if(node.visits == 0):
-            return float('inf')
-        
+        if node is None:
+            return -float("inf")
+        if node.visits == 0:
+            return float("inf")
+
         par = node.parent
-        if(par == None):
+        if par == None:
             par = node
-        
+
         valueScore = node.wins / node.visits
-        priorScore = self.explorationConstant * par.nnProbabilities[node.resultingMove] * sqrt(log(par.visits) / node.visits)
-        
+        priorScore = (
+            self.explorationConstant
+            * par.nnProbabilities[node.resultingMove]
+            * sqrt(log(par.visits) / node.visits)
+        )
+
         return valueScore + priorScore
-        
+
     def MCTSSimulation(self, root):
         """Does a MCTS simulation from the given root node.
-        
+
         Args:
             root (Node): The root node of the tree.
         """
         # select the node to expand
         toExpand = None
         curr = root
+        depth = 0
         while curr:
-            if(curr.endNode):
+            if curr.endNode:
+                print()
+                print("Error: End node reached")
                 break
-            if(curr.notFullyExpanded()):
+            if curr.notFullyExpanded():
                 toExpand = curr
                 break
-            
+
             nxt = None
             for move in curr.validMoves:
-                if(curr.children[move] is None):
+                if curr.children[move] is None:
                     continue
-                if(nxt is None or self.getUCT(curr.children[move]) > self.getUCT(nxt)):
+                if(curr.children[move].endNode):
+                    continue
+                if nxt is None or self.getUCT(curr.children[move]) > self.getUCT(nxt):
                     nxt = curr.children[move]
             curr = nxt
-            if(nxt is None):
+            depth += 1
+            if nxt is None:
                 print("Error: no valid move found although the node is not an end node")
                 break
             
-        if(toExpand is None):
-            return None
-        
+            
+        if toExpand is None:
+            print("Error: no node to expand found although the tree is not fully expanded")
+            return
+
         # expand the selected node
         # make a random move and create a new node for it
-        move = Board.getRandomMove(toExpand.state, toExpand.player)
-        moveIndex = Board.indexFromMove(move)
+        # moves which are valid and are not currently expanded are considered
+        moves = []
+        for move in toExpand.validMoves:
+            if(toExpand.children[move] is None):
+                moves.append(move)
+        if(len(moves) == 0):
+            print("Error: no valid move found although the node is not an end node")
+        moveIndex = np.random.choice(moves)
+        move = Board.moveFromIndex(moveIndex)
         nextState = Board.getNextState(toExpand.state, move)
         player = Board.getNextPlayer(toExpand.player)
         endNode = Board.getWinner(nextState) != 0
-        newNode = Node(state=nextState, player=player, endNode = endNode, resultingMove=moveIndex)
+        newNode = Node(
+            state=nextState, player=player, endNode=endNode, resultingMove=moveIndex
+        )
         # do a rollout from the new node
         newNode.nnValue, newNode.nnProbabilities = self.rollout(newNode)
         newNode.wins += newNode.nnValue
         # add the new node to the tree
         toExpand.addChild(newNode)
-        
+
         # do the backpropagation
         curr = newNode.parent
         while curr:
             curr.visits += 1
-            curr.wins += (1 - newNode.wins) if curr.player != newNode.player else newNode.wins
+            curr.wins += (
+                (1 - newNode.wins) if curr.player != newNode.player else newNode.wins
+            )
             curr = curr.parent
-    
+
     def rollout(self, node):
         """Does a rollout from a leaf node.
-        
+
         Returns:
             tuple (np.array, np.array): The value and the policy of the rollout according to the neural networks.
         """
-        if(node.endNode):
+        if node.endNode:
             return (1 if Board.getWinner(node.state) == node.player else -1), None
-        
+
         input = Board.getStateForPlayer(node.state, node.player)
         value = self.valueNetwork(input)
         policy = self.policyNetwork(input)
-        
-        return value.detach().numpy()[0][0], policy.detach().numpy()[0]
 
-  
+        return value.detach().numpy()[0][0], policy.detach().numpy()[0]
