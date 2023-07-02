@@ -123,7 +123,7 @@ class Node:
         valueScore = self.win / self.visitCount
         priorScore = (
             self.explorationConstant
-            * par.nnProbabilities[self.resultingMove]
+            * par.policy[self.resultingMove]
             * sqrt(log(par.visitCount) / self.visitCount)
         )
 
@@ -159,7 +159,7 @@ class Node:
         bestNode = None
         for move in self.validMoves:
             if self.children[move] is not None:
-                if bestNode == None or self.children[move].getUCT() > bestNode.getUCT:
+                if bestNode == None or self.children[move].getUCT() > bestNode.getUCT():
                     bestNode = self.children[move]
         return bestNode.select()
 
@@ -243,8 +243,11 @@ class Node:
             return Board.getRandomMove(state, player)
         
         visits = [(0 if node.children[move] is None else node.children[move].visitCount) for move in node.validMoves]
+        s = np.sum(visits)
+        if(s == 0):
+            return Board.getRandomMove(state, player)
         visits /= np.sum(visits)
-        ind = np.random.choice(np.arange(len(node.validMoves)), visits)
+        ind = int(np.random.choice(np.arange(len(node.validMoves)), size=1, p=visits)[0])
         move = node.validMoves[ind]
         return move
         

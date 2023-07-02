@@ -116,7 +116,7 @@ class Board:
         if state[move[2], move[3]] != 0:
             print("Invalid move: Target square already occupied")
             return nextState
-        if(abs(move[0]-move[2]) > 1 or abs(move[1]-move[3])):
+        if(abs(move[0]-move[2]) > 1 or abs(move[1]-move[3]) > 1):
             print("Invalid move: starting and ending square is not valid")
 
         nextState[move[2], move[3]] = state[move[0], move[1]]
