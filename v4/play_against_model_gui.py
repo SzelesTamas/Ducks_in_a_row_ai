@@ -1,7 +1,8 @@
 """When running this file the user can play against a vanilla Monte Carlo Tree Search a match of Ducks in a row."""
 from typing import Any, Literal
 from ducks_in_a_row import Board
-from alphazero_agent import AlphaZeroAgent
+from agent import Node
+from neural_networks import ValueNetwork, PolicyNetwork
 import os
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
@@ -41,18 +42,26 @@ class Game:
         self.boardRect = [
             [None for y in range(5)] for x in range(5)
         ]  # list to store the board square objects in
-        self.selectedSquares = []  # clicked squares, the length of it is at most 2
+
+        self.selectedPiece = None
+        self.startSquare = None
         self.font = pygame.font.SysFont("Comic Sans MS", 40)
 
         # game parameteres
-        self.board = Board()
+        self.currentState = Board.getStartingState()
         self.agentInd = agentInd
-        self.agent = AlphaZeroAgent(
-            agentInd,
-            1.4,
-            simulationCount=simulationCount,
-            valueNetworkPath=valueNetworkPath,
-            policyNetworkPath=policyNetworkPath,
+        self.humanInd = Board.getNextPlayer(agentInd)
+        self.valueNetwork = ValueNetwork(valueNetworkPath)
+        self.policyNetwork = PolicyNetwork(policyNetworkPath)
+        self.simulationCount = simulationCount
+        self.onTurn = 1
+
+        self.pieces = [
+            (0, 0) for _ in range(12)
+        ]  # list to store the coordinate of each piece
+        self.recalculatePiecePositions()
+        self.root = Node(
+            self.currentState, 1, None, self.valueNetwork, self.policyNetwork
         )
 
     def drawBoard(self):
@@ -79,27 +88,21 @@ class Game:
 
     def drawPieces(self):
         """Draws the pieces on the board as circles."""
+        for ind, temp in enumerate(self.pieces):
+            x, y = temp
+            if ind < 6:
+                color = (0, 0, 0)
+            else:
+                color = (255, 255, 255)
 
-        for x in range(5):
-            for y in range(5):
-                if self.board.state[x][y] == 1:
-                    color = (0, 0, 0)
-                elif self.board.state[x][y] == 2:
-                    color = (255, 255, 255)
-                else:
-                    color = None
-
-                if color is not None:
-                    pygame.draw.circle(
-                        self.screen,
-                        color,
-                        (
-                            y * self.outsideSquareSize + self.outsideSquareSize / 2,
-                            x * self.outsideSquareSize + self.outsideSquareSize / 2,
-                        ),
-                        self.innerSquareSize / 2 * 0.8,
-                        width=0,
-                    )
+            if color is not None:
+                pygame.draw.circle(
+                    self.screen,
+                    color,
+                    (x, y),
+                    self.innerSquareSize / 2 * 0.8,
+                    width=0,
+                )
 
     def checkGameOver(self):
         """Checks if the game is over and stops the game if it is
@@ -108,7 +111,7 @@ class Game:
             bool: True if the game is not over, False if it is
         """
 
-        ret = Board.getWinner(self.board.state)
+        ret = Board.getWinner(self.currentState)
         if ret == 1:
             text = self.font.render(
                 "Player 1(black) wins!", False, (0, 0, 0), (255, 255, 255)
@@ -138,79 +141,95 @@ class Game:
         return None
 
     def checkClick(self, pos):
-        """Checks if a square is clicked and appends it to the selected squares list.
+        """Moves the pieces according to the input.
 
         Args:
-            pos (tuple): The position of the click.
+            pos (tuple): The coordinate of the mouse.
         """
 
-        # get the clicked square
-        square = self.getSquare(pos)
-        if square is not None:
-            if len(self.selectedSquares) > 0:
-                if (
-                    self.selectedSquares[-1][0] == square[0]
-                    and self.selectedSquares[-1][1] == square[1]
-                ):
-                    pass
+        if self.selectedPiece is None and self.humanInd == self.onTurn:
+            square = self.getSquare(pos)
+            if square is None:
+                return
+            # On this square is a movable piece
+            if self.currentState[square[0], square[1]] == self.humanInd:
+                # get the corresponding piece
+                ind = -1
+                for i in range(12):
+                    temp = self.getSquare(self.pieces[i])
+                    if temp[0] == square[0] and temp[1] == square[1]:
+                        ind = i
+                        break
+
+                # change the position of the piece
+                if ind != -1:
+                    self.selectedPiece = ind
+                    self.startSquare = self.getSquare(self.pieces[ind])
+                    self.pieces[ind] = pos
+        else:
+            self.pieces[self.selectedPiece] = pos
+
+    def recalculatePiecePositions(self):
+        """Recalculates the piece positions based on the current state of the board."""
+
+        wInd = 0
+        bInd = 6
+        for x in range(5):
+            for y in range(5):
+                ind = -1
+                if self.currentState[x][y] == 1:
+                    ind = wInd
+                    wInd += 1
+                elif self.currentState[x][y] == 2:
+                    ind = bInd
+                    bInd += 1
                 else:
-                    self.selectedSquares.append(square)
-            else:
-                self.selectedSquares.append(square)
+                    continue
+
+                self.pieces[ind] = (
+                    y * self.outsideSquareSize + self.outsideSquareSize / 2,
+                    x * self.outsideSquareSize + self.outsideSquareSize / 2,
+                )
 
     def checkRelease(self, pos):
-        """Checks where the mouse is released and if the click and the release square are the same does nothing. If the clicked and the released square are different and it's a valid move it makes a move.
+        """If the user is on turn and makes a valid move executes it. Otherwise does nothing.
 
         Args:
-            pos: Position of the release on the screen.
+            pos (tuple): The coordinates of the mouse.
         """
-        if self.board.onTurn == self.agentInd:
-            return
-        if len(self.selectedSquares) == 0:
-            return
-
         square = self.getSquare(pos)
-        if square is not None:
-            if len(self.selectedSquares) == 1:
-                if (
-                    square[0] == self.selectedSquares[0][0]
-                    and square[1] == self.selectedSquares[0][1]
-                ):
-                    pass
-                else:
-                    validMoves = Board.getValidMoves(
-                        self.board.state, self.board.onTurn
-                    )
-                    move = (
-                        self.selectedSquares[0][0],
-                        self.selectedSquares[0][1],
-                        square[0],
-                        square[1],
-                    )
-                    if move in validMoves:
-                        self.board.makeMove(move)
-                    self.selectedSquares = []
-            else:
-                if (
-                    square[0] == self.selectedSquares[0][0]
-                    and square[1] == self.selectedSquares[0][1]
-                ):
-                    pass
-                else:
-                    validMoves = Board.getValidMoves(
-                        self.board.state, self.board.onTurn
-                    )
-                    move = (
-                        self.selectedSquares[0][0],
-                        self.selectedSquares[0][1],
-                        self.selectedSquares[1][0],
-                        self.selectedSquares[1][1],
-                    )
-                    if move in validMoves:
-                        self.board.makeMove(move)
-                    self.selectedSquares = []
+        if (
+            square is not None
+            and self.currentState[square[0], square[1]] == 0
+            and self.onTurn == self.humanInd
+            and self.selectedPiece is not None
+            and self.startSquare is not None
+        ):
+            move = (self.startSquare[0], self.startSquare[1], square[0], square[1])
+            # check if it's a valid move
+            if move in [
+                Board.indexToMove(m)
+                for m in Board.getValidMoves(self.currentState, self.humanInd)
+            ]:
+                moveInd = Board.moveToIndex(move)
+                self.currentState = Board.getNextState(self.currentState, moveInd)
+                self.onTurn = Board.getNextPlayer(self.onTurn)
 
-    def startGame(self):
+        self.startSquare = None
+        self.selectedPiece = None
+        self.recalculatePiecePositions()
+
+    def agentTurn(self):
+        """Runs the simulations and then makes the best moves according to the agent."""
+        for i in range(self.simulationCount):
+            self.root.expandTree()
+        moveInd = self.root.getMove(self.currentState, self.agentInd)
+        print(f"Agent made move {Board.indexToMove(moveInd)}")
+        self.currentState = Board.getNextState(self.currentState, moveInd)
+        self.onTurn = Board.getNextPlayer(self.onTurn)
+        self.recalculatePiecePositions()
+
+    def playGame(self):
         """Starts the game and runs it until termination."""
 
         # draw the game
@@ -218,29 +237,30 @@ class Game:
         self.drawPieces()
         pygame.display.update()
 
+        mouseDown = False
         running = True
-        mousePressed = False
         while running:
             # check the user/model input
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
 
-                if self.board.onTurn == self.agentInd:
+                if self.onTurn == self.agentInd:
                     # agents turn
                     print("Agent is thinking...")
-                    move, _ = self.agent.getMove(self.board.state)
-                    move = Board.moveFromIndex(move)
-                    self.board.makeMove(move)
+                    self.agentTurn()
                     print("Your turn!")
                 else:
                     # human turn
-                    if event.type == pygame.MOUSEBUTTONDOWN and not mousePressed:
-                        mousePressed = True
+                    if event.type == pygame.MOUSEBUTTONDOWN:
                         self.checkClick(pygame.mouse.get_pos())
+                        mouseDown = True
                     if event.type == pygame.MOUSEBUTTONUP:
-                        mousePressed = False
                         self.checkRelease(pygame.mouse.get_pos())
+                        mouseDown = False
+
+                    if mouseDown:
+                        self.checkClick(pygame.mouse.get_pos())
 
             # draw the game
             self.drawBoard()
@@ -256,9 +276,15 @@ if __name__ == "__main__":
     pygame.init()
     pygame.font.init()
     screen = pygame.display.set_mode((500, 500))
-    modelPath = "models/v2"
+    modelPath = "models/v1"
     valueNetworkPath = os.path.join(modelPath, "valueNetwork.pt")
     policyNetworkPath = os.path.join(modelPath, "policyNetwork.pt")
-    game = Game(screen=screen, agentInd=2, simulationCount=1000, valueNetworkPath=valueNetworkPath, policyNetworkPath=policyNetworkPath)
+    game = Game(
+        screen=screen,
+        agentInd=2,
+        simulationCount=1000,
+        valueNetworkPath=valueNetworkPath,
+        policyNetworkPath=policyNetworkPath,
+    )
     print("Game started!")
-    game.startGame()
+    game.playGame()
