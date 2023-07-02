@@ -398,6 +398,20 @@ class SelfPlayTrainer:
             games = [0, 0]  # [currentAgent, savedAgent]
             games[0] += games1[0] + games2[1]
             games[1] += games1[1] + games2[0]
+            
+            # playing 10 games against a random player
+            agent1 = AlphaZeroAgent(
+                player=1,
+                simulationCount=self.simulationCount,
+                valueNetwork=savedValueNetwork,
+                policyNetwork=savedPolicyNetwork,
+            )
+            agent2 = AlphaZeroAgent()
+            board = Board()
+            replayBuffer = ReplayBuffer(1)
+            manager = GameManager(agent1, agent2, board, replayBuffer, verbose=True)
+            games3 = manager.playGames(20)
+            print(f"Agent has {games3[0] / 20} winrate against random player")
 
             print(
                 f"Current agent won {games[0]} games and saved agent won {games[1]} games."
