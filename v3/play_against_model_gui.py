@@ -256,7 +256,7 @@ if __name__ == "__main__":
     pygame.init()
     pygame.font.init()
     screen = pygame.display.set_mode((500, 500))
-    modelPath = "models/v1"
+    modelPath = "models/v2"
     valueNetworkPath = os.path.join(modelPath, "valueNetwork.pt")
     policyNetworkPath = os.path.join(modelPath, "policyNetwork.pt")
     game = Game(screen=screen, agentInd=2, simulationCount=1000, valueNetworkPath=valueNetworkPath, policyNetworkPath=policyNetworkPath)
