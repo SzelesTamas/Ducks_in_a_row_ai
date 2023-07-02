@@ -42,10 +42,10 @@ class Board:
 
         # check if move is valid
         if self.state[move[0], move[1]] != self.onTurn:
-            print("Invalid move!")
+            print("Invalid move! 1", move)
             return 0, self.state, False, None
         if self.state[move[2], move[3]] != 0:
-            print("Invalid move!")
+            print("Invalid move! 2", move)
             return 0, self.state, False, None
 
         # change the state
