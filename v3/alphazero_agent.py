@@ -169,6 +169,91 @@ class AlphaZeroAgent:
         # Initialize the root node for the MCTS tree
         self.root = None
 
+    def setRoot(self, state, debug=False):
+        """Sets the root node of the tree for the given state.
+
+        Args:
+            state (numpy.array): The state of the environment.
+        """
+
+        # If the root node is not initialized, initialize it
+        if self.root is None:
+            self.root = Node(state.copy(), self.player)
+            self.root.nnValue, self.root.nnProbabilities = self.rollout(self.root)
+            if(debug):
+                print("Creating root for the first time")
+        else:
+            # Search the grandchildren of the root node for the current state
+            for move1 in self.root.validMoves:
+                if(self.root.children[move1] is None):
+                    continue
+                for move2 in self.root.children[move1].validMoves:
+                    if(self.root.children[move1].children[move2] is None):
+                        continue
+                    if np.array_equal(self.root.children[move1].children[move2].state, state):
+                        self.root = self.root.children[move1].children[move2]
+                        if(debug):
+                            print("Found root in grandchildren")
+                        return
+            
+            # Search the tree for the current state with a BFS to get the root node
+            queue = [self.root]
+            newRoot = None
+            currSize = 1
+            nextSize = 0
+            depth = 0
+            while len(queue) > 0:
+                currSize -= 1
+                currNode = queue.pop(0)
+                if np.array_equal(currNode.state, state):
+                    newRoot = currNode
+                    break
+                for child in currNode.children:
+                    if child is not None:
+                        queue.append(child)
+                        nextSize += 1
+                if currSize == 0:
+                    depth += 1
+                    currSize = nextSize
+                    nextSize = 0
+            
+            if(newRoot):
+                if(debug):
+                    print("Found root in tree")
+                self.root = newRoot
+                return
+        
+            # Search the grandchildren states of the root node for the current state
+            # if found create the node and set it as the root
+            for move1Ind in self.root.validMoves:
+                childState = Board.getNextState(self.root.state, Board.moveFromIndex(move1Ind))
+                validMoves = Board.getValidMoves(childState, Board.getNextPlayer(self.root.player))
+                
+                for move2 in validMoves:
+                    grandChildState = Board.getNextState(childState, move2)
+                    if(np.array_equal(grandChildState, state)):
+                        # Connect the new node to the tree
+                        if(debug):
+                            print("Creating root from grandchildren")
+                        if(self.root.children[move1Ind] is None):
+                            child = Node(childState.copy(), Board.getNextPlayer(self.player), self.root, resultingMove=move1Ind)
+                            child.nnValue, child.nnProbabilities = self.rollout(child)
+                            self.root.addChild(child)
+                        else:
+                            child = self.root.children[move1Ind]
+                        move2Ind = Board.indexFromMove(move2)
+                        self.root = Node(grandChildState.copy(), self.player, child, resultingMove=move2Ind)
+                        self.root.nnValue, self.root.nnProbabilities = self.rollout(self.root)
+                        child.addChild(self.root)
+                        
+                        return
+            
+            if(debug):
+                print("Creating root from scratch")
+            # If the state is not found in the tree, create a new root node
+            self.root = Node(state.copy(), self.player)
+            self.root.nnValue, self.root.nnProbabilities = self.rollout(self.root)
+            
     def getMove(self, state, debug=False):
         """Returns the best move for the given state according to the agent.
 
@@ -179,50 +264,7 @@ class AlphaZeroAgent:
         Returns:
             tuple: (The index of the best move, the policy probabilities for the given state)
         """
-
-        # If the root node is not initialized, initialize it
-        if self.root is None:
-            if debug:
-                print("Creating new root for starting state")
-            self.root = Node(state.copy(), self.player)
-            self.root.nnValue, self.root.nnProbabilities = self.rollout(self.root)
-        else:
-            # Search the tree for the current state with a BFS to get the root node
-            queue = [self.root]
-            newRoot = None
-            currSize = 1
-            nextSize = 0
-            depth  = 0
-            if(debug):
-                print("Searching for node with state:\n", state)
-                print("Root state:\n", self.root.state)
-            while len(queue) > 0:
-                node = queue.pop(0)
-                if np.array_equal(node.state, state) and node.player == self.player:
-                    newRoot = node
-                    break
-                currSize -= 1
-                
-                for child in node.children:
-                    if child is not None:
-                        queue.append(child)
-                        nextSize += 1
-                        
-                if currSize == 0:
-                    depth += 1
-                    currSize, nextSize = nextSize, currSize
-
-            if newRoot is None:
-                if(debug):
-                    print("Creating new root for state---------------------------------------")
-                    print(state)               
-                                   
-                self.root = Node(state.copy(), self.player)
-                self.root.nnValue, self.root.nnProbabilities = self.rollout(self.root)
-            else:
-                self.root = newRoot
-                if(debug):
-                    print("Reusing root")
+        self.setRoot(state, debug=debug)
 
         # Monte Carlo Tree Search
         # In the previous version I've tried the parallelization of the rollouts but it was slower than the sequential version
@@ -264,6 +306,10 @@ class AlphaZeroAgent:
         if node is None:
             return -float("inf")
         if node.visits == 0:
+            return float("inf")
+        
+        # encourage immediate wins
+        if node.endNode:
             return float("inf")
 
         par = node.parent

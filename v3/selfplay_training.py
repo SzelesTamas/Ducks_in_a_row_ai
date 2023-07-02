@@ -56,6 +56,10 @@ class ReplayBuffer:
 
         return states, targetValues, targetPolicies
 
+    def clear(self):
+        """Clears the buffer."""
+        self.memory.clear()
+
     def __len__(self):
         """Returns the length of the buffer.
 
@@ -177,10 +181,10 @@ class GameManager:
                 root2 = root2.children[move]
 
             if root1 == None:
-                print("Error: root1 is None", ind)
+                print("Error: root1 is None ind:", ind)
                 break
             if root2 == None:
-                print("Error: root2 is None", ind)
+                print("Error: root2 is None ind:", ind)
                 break
 
         if self.verbose:
@@ -308,6 +312,8 @@ class SelfPlayTrainer:
             self.train()
             print("Testing and saving the model...")
             self.saveBestModel()
+            print("Clearing the replay buffer...")
+            self.replayBuffer.clear()
 
     def train(self):
         """Trains the model for a number of epochs (1 epoch means on 1 batch) with the data in the replay buffer."""
@@ -353,7 +359,7 @@ class SelfPlayTrainer:
                 modelPath=os.path.join(self.savePath, "policyNetwork.pt")
             )
             #  games as player 1
-            numGames = 10
+            numGames = 25
             agent1 = AlphaZeroAgent(
                 player=1,
                 simulationCount=self.simulationCount,
@@ -396,7 +402,7 @@ class SelfPlayTrainer:
             print(
                 f"Current agent won {games[0]} games and saved agent won {games[1]} games."
             )
-            if games[0] >= int(numGames*0.55):
+            if games[0] > int(numGames*2*0.55):
                 # save the models
                 print("The new model was better. Saving it.")
                 self.valueNetwork.save(os.path.join(self.savePath, "valueNetwork.pt"))
@@ -408,11 +414,11 @@ class SelfPlayTrainer:
 torch.manual_seed(0)
 random.seed(0)
 np.random.seed(0)
-simulationCount = 1000
-trainAfter = 5
-n_epochs = 50
+simulationCount = 300
+trainAfter = 100
+n_epochs = 100
 savePath = "models/v1"
 trainer = SelfPlayTrainer(
-    savePath=savePath, simulationCount=simulationCount, trainAfter=trainAfter, n_epochs=n_epochs
+    savePath=savePath, sourcePath=savePath, simulationCount=simulationCount, trainAfter=trainAfter, n_epochs=n_epochs
 )
-trainer.trainForEpisodes(10)
+trainer.trainForEpisodes(100)
