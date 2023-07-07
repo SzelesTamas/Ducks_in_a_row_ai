@@ -15,5 +15,9 @@ In this version I implemented an AlphaZero like algorithm.
 I think it was a success because after a few episodes of training it learned a little but I want to train it for more time.
 In the next version I will try to polish the implementation because in some places it is a bit messy.
 
+## Version 4
+This version is just a nicer implementation of the previous version.
+I corrected some pretty major bugs and the agent started to converge but I need to run it for some more time.
+
 ## Notes
 As an experiment I am using GitHub Copilot whenever possible
