@@ -10,6 +10,10 @@ import pygame
 from time import sleep
 from math import sqrt
 
+import random
+import numpy as np
+import torch
+
 
 class Game:
     """This is a class for managing the MCTS Agent and creating a GUI."""
@@ -223,7 +227,7 @@ class Game:
         """Runs the simulations and then makes the best moves according to the agent."""
         for i in range(self.simulationCount):
             self.root.expandTree()
-        moveInd = self.root.getMove(self.currentState, self.agentInd)
+        moveInd, _ = self.root.getMove(self.currentState, self.agentInd)
         print(f"Agent made move {Board.indexToMove(moveInd)}")
         self.currentState = Board.getNextState(self.currentState, moveInd)
         self.onTurn = Board.getNextPlayer(self.onTurn)
@@ -273,15 +277,19 @@ class Game:
 
 
 if __name__ == "__main__":
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+
     pygame.init()
     pygame.font.init()
     screen = pygame.display.set_mode((500, 500))
-    modelPath = "models/v1"
+    modelPath = "models/v4"
     valueNetworkPath = os.path.join(modelPath, "valueNetwork.pt")
     policyNetworkPath = os.path.join(modelPath, "policyNetwork.pt")
     game = Game(
         screen=screen,
-        agentInd=2,
+        agentInd=1,
         simulationCount=1000,
         valueNetworkPath=valueNetworkPath,
         policyNetworkPath=policyNetworkPath,

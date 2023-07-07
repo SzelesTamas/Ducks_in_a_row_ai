@@ -10,7 +10,7 @@ class PolicyNetwork(nn.Module):
         self,
         modelPath=None,
         inputSize: int = 25,
-        hiddenSize: int = 200,
+        hiddenSize: int = 500,
         outputSize: int = 200,
     ):
         """Initializes the PolicyNetwork class.

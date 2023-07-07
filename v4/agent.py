@@ -45,7 +45,7 @@ class Node:
             self.isValidMove[move] = True
         self.visitCount = 0
         self.win, self.policy = self.rollout()
-        if(self.endNode):
+        if self.endNode:
             self.win = 1
             self.value = 1
 
@@ -114,11 +114,11 @@ class Node:
 
         # encourage immediate wins
         if self.endNode:
-            return float("inf")
+            return float(100000)
 
         par = self.parent
         if par == None:
-            par = self
+            return 1
 
         valueScore = self.win / self.visitCount
         priorScore = (
@@ -155,13 +155,20 @@ class Node:
         if self.notFullyExpanded():
             return self
 
-        # choose the next node based on the UCT formula
-        bestNode = None
+        # sample the next node to visit based on it's UCT value
+        ucts = []
+        nextNode = None
         for move in self.validMoves:
             if self.children[move] is not None:
-                if bestNode == None or self.children[move].getUCT() > bestNode.getUCT():
-                    bestNode = self.children[move]
-        return bestNode.select()
+                ucts.append(self.children[move].getUCT())
+        ucts = np.array(ucts)
+        ucts /= np.sum(ucts)
+        if len(ucts) == 0:
+            return self
+        # sample the next node to visit based on it's UCT value
+        ind = int(np.random.choice(np.arange(len(ucts)), size=1, p=ucts)[0])
+        nextNode = self.children[self.validMoves[ind]]
+        return nextNode.select()
 
     def expand(self):
         """Runs the expansion part of MCTS algorithm.
@@ -176,7 +183,14 @@ class Node:
             if self.children[move] is None:
                 moves.append(move)
         if len(moves) == 0:
-            print("Error: no valid move found although the node is not an end node")
+            winner = Board.getWinner(self.state)
+            if winner == 0:
+                print("Error: No moves left but no winner")
+                print(self.state)
+            else:
+                self.visitCount += 1
+                self.win = 1 if winner == self.player else 0
+            return None
         moveIndex = np.random.choice(moves)
 
         # creating a new node for that random move
@@ -196,27 +210,35 @@ class Node:
 
     def calculateWinAndVisit(self):
         """Calculates the win and visit of the current node from the child nodes.
-            If there are no child nodes it will do nothing.
+        If there are no child nodes it will do nothing.
         """
-        count, s = 0, 0
-        for move in self.validMoves:
-            if(self.children[move] is not None):
-                count += 1
-                s += self.children[move].win
-                self.visitCount += self.children[move].visitCount
-                
-        self.win = ((s / count) if count > 0 else self.win)
+        if self.endNode:
+            self.visitCount += 1
+        else:
+            newVisit = 0
+            hasChild = False
+            newWin = 0
+            for move in self.validMoves:
+                if self.children[move] is not None:
+                    hasChild = True
+                    newVisit += self.children[move].visitCount
+                    newWin += self.children[move].win * self.policy[move]
+
+            if hasChild:
+                # self.win = newWin
+                self.visitCount = newVisit
+            else:
+                self.visitCount += 1
 
     def backpropagate(self):
-        """Recalculates the win and visit in the ancestors of the node.
-        """
+        """Recalculates the win and visit in the ancestors of the node."""
         self.calculateWinAndVisit()
-        if(self.parent is not None):
+        if self.parent is not None:
             self.parent.backpropagate()
-        
+
     def expandTree(self):
         """Expands the tree by running a full MCTS simulation(selection, expansion, rollout, backpropagation).
-            The backpropagation goes all the way to the root node even if the function was not started from there.
+        The backpropagation goes all the way to the root node even if the function was not started from there.
         """
 
         # select the node to expand
@@ -224,56 +246,158 @@ class Node:
         if toExpand is None:
             print("No node to expand")
             return
-        expanded = toExpand.expand() # on the creation of the node the constructor also does the rollout phase
-        expanded.backpropagate()
-    
+        newChild = (
+            toExpand.expand()
+        )  # on the creation of the node the constructor also does the rollout phase
+        if newChild is None:
+            toExpand.backpropagate()
+            return
+        newChild.backpropagate()
+
     def getMove(self, state, player):
         """Returns a move index for a state. The move is sampled randomly based on the MCTS tree visit count because it should have a good value.
 
         Args:
             state (np.array): The state to get the move for.
             player (int): The index of the player on turn.
-        
+
         Returns:
-            int: The index of the move.
+            tuple (int, np.array): The move index and the visit count of each child node.
         """
-        node = self.getNodeForState(state, player) # get a corresponding node in the tree
-        if(node is None):
+        node = self.getNodeForState(
+            state, player
+        )  # get a corresponding node in the tree
+        if node is None:
             # return a random move if the node is not found in the tree
-            return Board.getRandomMove(state, player)
-        
-        visits = [(0 if node.children[move] is None else node.children[move].visitCount) for move in node.validMoves]
+            visits = np.random.rand(200)
+            visits /= np.sum(visits)
+            return Board.getRandomMove(state, player), visits
+
+        visits = np.array(
+            [
+                (0 if node.children[move] is None else node.children[move].visitCount)
+                for move in range(200)
+            ],
+            dtype=np.float32,
+        )
         s = np.sum(visits)
-        if(s == 0):
-            return Board.getRandomMove(state, player)
+        if s == 0:
+            visits = np.random.rand(200)
+            visits /= np.sum(visits)
+            return Board.getRandomMove(state, player), visits
         visits /= np.sum(visits)
-        ind = int(np.random.choice(np.arange(len(node.validMoves)), size=1, p=visits)[0])
-        move = node.validMoves[ind]
-        return move
-        
+        move = int(np.random.choice(np.arange(200), size=1, p=visits)[0])
+        return move, visits
+
     def getBestMove(self, state, player):
         """Returns index of the best move according to the agent for a state. Best means the node with the maximum visitCount.
-        
+
         Args:
             state (np.array): The state to get the move for.
             player (int): The index of the player on turn.
-        
+
         Returns:
-            int: The index of the best move.
+            tuple (int, np.array): The index of the move and the visit counts of each child node.
         """
-        node = self.getNodeForState(state, player) # get a corresponding node in the tree
-        if(node is None):
+        node = self.getNodeForState(
+            state, player
+        )  # get a corresponding node in the tree
+        if node is None:
             # return a random move if the node is not found in the tree
-            return Board.getRandomMove(state, player)
-        
-        visits = [(0 if node.children[move] is None else node.children[move].visitCount) for move in node.validMoves]
+            visits = np.random.rand(200)
+            visits /= np.sum(visits)
+            return Board.getRandomMove(state, player), visits
+
+        visits = np.array(
+            [
+                (0 if node.children[move] is None else node.children[move].visitCount)
+                for move in range(200)
+            ],
+            dtype=np.float32,
+        )
         visits /= np.sum(visits)
-        ind = visits.argmax()[0]
-        move = node.validMoves[ind]
-        return move   
+        move = visits.argmax()[0]
+        return move, visits
+
+    def getTreeSize(self):
+        """Returns the number of nodes in the tree starting from the current node.
+
+        Returns:
+            int: The number of nodes in the tree, including the current node.
+        """
+        ret = 1
+        for move in range(200):
+            if self.children[move] is not None:
+                ret += self.children[move].getTreeSize()
+        return ret
 
 
+class Agent:
+    """This is a class for implementing an agent that uses the MCTS algorithm to play the game."""
 
+    def __init__(
+        self,
+        simulationCount=1000,
+        policyNetwork=None,
+        valueNetwork=None,
+        explorationConstant=1.4,
+    ):
+        """Initializes the agent.
 
+        Args:
+            simulationCount (int, optional): The number of simulations to run for each move. Defaults to 1000.
+            policyNetwork (torch.nn.Module, optional): The policy network. Defaults to None.
+            valueNetwork (torch.nn.Module, optional): The value network. Defaults to None.
+            explorationConstant (float, optional): The exploration constant for the MCTS algorithm. Defaults to 1.4.
+        """
+        self.simulationCount = simulationCount
+        self.policyNetwork = policyNetwork
+        self.valueNetwork = valueNetwork
+        self.explorationConstant = explorationConstant
 
+        self.rootNode = Node(
+            state=Board.getStartingState(),
+            player=1,
+            valueNetwork=self.valueNetwork,
+            policyNetwork=self.policyNetwork,
+            explorationConstant=self.explorationConstant,
+            resultingMove=None,
+        )
 
+    def clearTree(self):
+        """Clears the tree of the agent."""
+        self.rootNode = Node(
+            state=Board.getStartingState(),
+            player=1,
+            valueNetwork=self.valueNetwork,
+            policyNetwork=self.policyNetwork,
+            explorationConstant=1.4,
+            resultingMove=None,
+        )
+
+    def getMove(self, state, player):
+        """Returns a move index for a state after the simulations. The move is sampled randomly based on the MCTS tree visit count because it should have a good value.
+
+        Args:
+            state (np.array): The state to get the move for.
+            player (int): The index of the player on turn.
+
+        Returns:
+            int: The index of the move.
+        """
+        startFrom = self.rootNode.getNodeForState(state, player)
+        if startFrom == None:
+            self.rootNode = Node(
+                state=state,
+                player=player,
+                valueNetwork=self.valueNetwork,
+                policyNetwork=self.policyNetwork,
+                explorationConstant=1.4,
+                resultingMove=None,
+            )
+            startFrom = self.rootNode
+
+        for i in range(self.simulationCount):
+            startFrom.expandTree()
+
+        return startFrom.getMove(state, player)

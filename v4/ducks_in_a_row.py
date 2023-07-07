@@ -74,7 +74,7 @@ class Board:
         Args:
             player (int): The current player index.
         """
-        return (player % 2) + 1
+        return 3 - player
 
     def getWinner(state):
         """Returns the index of the winner, 0 if no winner.
@@ -168,6 +168,9 @@ class Board:
         validMoves = Board.getValidMoves(state, player)
         if(len(validMoves) == 0):
             print("Error: No valid random move to make")
+            print(state)
+            print("Player: ", player)
+            print("Winner: ", Board.getWinner(state))
             return -1
         return random.choice(validMoves)
 
