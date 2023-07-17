@@ -1,4 +1,4 @@
-"""When running this file the user can play against a vanilla Monte Carlo Tree Search a match of Ducks in a row."""
+"""When running this file the user can play against an Alphazero like agent a match of Ducks in a row."""
 from typing import Any, Literal
 from ducks_in_a_row import Board
 from agent import Node
@@ -25,6 +25,7 @@ class Game:
         simulationCount: int = 1000,
         valueNetworkPath: str = None,
         policyNetworkPath: str = None,
+        explorationConstant: float = 1.4,
     ):
         """Initializes the Game class.
 
@@ -34,6 +35,7 @@ class Game:
             simulationCount (int, optional): The number of simulations the MCTS Agent will run. Defaults to 1000.
             valueNetworkPath (str, optional): Path to the value network. Defaults to None.
             policyNetworkPath (str, optional): Path to the policy network. Defaults to None.
+            explorationConstant (float, optional): Exploration constant for the MCTS agent. Defaults to 1.4.
         """
 
         # GUI parameters
@@ -65,7 +67,7 @@ class Game:
         ]  # list to store the coordinate of each piece
         self.recalculatePiecePositions()
         self.root = Node(
-            self.currentState, 1, None, self.valueNetwork, self.policyNetwork
+            self.currentState, 1, None, self.valueNetwork, self.policyNetwork, explorationConstant=explorationConstant
         )
 
     def drawBoard(self):
@@ -284,15 +286,16 @@ if __name__ == "__main__":
     pygame.init()
     pygame.font.init()
     screen = pygame.display.set_mode((500, 500))
-    modelPath = "models/v4"
+    modelPath = "models/v11"
     valueNetworkPath = os.path.join(modelPath, "valueNetwork.pt")
     policyNetworkPath = os.path.join(modelPath, "policyNetwork.pt")
     game = Game(
         screen=screen,
-        agentInd=1,
-        simulationCount=1000,
+        agentInd=2,
+        simulationCount=10000,
         valueNetworkPath=valueNetworkPath,
         policyNetworkPath=policyNetworkPath,
+        explorationConstant=1.4
     )
     print("Game started!")
     game.playGame()

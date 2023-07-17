@@ -197,7 +197,7 @@ class TreeViewer:
 
             # display the win probability, the number of visits of the current node and the current player
             text = self.font.render(
-                "Win probability: " + str(round(self.currentNode.win, 4)),
+                "Total reward: " + str(round(self.currentNode.win, 4)),
                 True,
                 (0, 0, 0),
             )
@@ -228,6 +228,17 @@ class TreeViewer:
                 (0, 0, 0),
             )
             self.screen.blit(text, (400, 570))
+            
+            # display the probability of winning according to the value network
+            input = np.array([Board.getStateForPlayer(self.currentNode.state, self.currentNode.player)])
+            value = self.valueNetwork(input)
+            text = self.font.render(
+                "Value network: " + str(round(value.item(), 4)),
+                True,
+                (0, 0, 0),
+            )
+            self.screen.blit(text, (790, 510))
+            
 
             pygame.display.update()
 
@@ -239,11 +250,14 @@ if __name__ == "__main__":
 
     pygame.init()
     pygame.font.init()
-    modelPath = "models/v4"
+    modelPath = "models/v11"
     valueNetworkPath = os.path.join(modelPath, "valueNetwork.pt")
     policyNetworkPath = os.path.join(modelPath, "policyNetwork.pt")
 
     treeViewer = TreeViewer(
-        ValueNetwork(valueNetworkPath), PolicyNetwork(policyNetworkPath), 1000, 1.4
+        ValueNetwork(valueNetworkPath),
+        PolicyNetwork(policyNetworkPath),
+        1000,
+        explorationConstant=1.4,
     )
     treeViewer.viewTree()

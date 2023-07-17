@@ -19,5 +19,24 @@ In the next version I will try to polish the implementation because in some plac
 This version is just a nicer implementation of the previous version.
 I corrected some pretty major bugs and the agent started to converge but I need to run it for some more time.
 
-## Notes
+## Version 5
+In this version I'm trying to implement a DQN like algorithm because I think it will be faster to train.
+This version is more promising because I hope it learns faster than the previous version.
+DQN is a little strong here because it just uses a neural network to approximate the value of a state action pair.
+It does not use the Bellman Equation to update the value of a state action pair.
+I will try to implement the Bellman Equation in the next version.
+This agent did not converge at all.
+
+## Version 6
+In this version I implemented a simple MiniMax algorithm with a neural network which gives value for uncertain leaf nodes.
+With AlphaBeta pruning it is pretty fast and beats me almost every time. Although this is a solution I'd like to revisit the previous versions and try to make them work.
+
+
+
+## Note
+I'm reading this book (http://incompleteideas.net/book/RLbook2020.pdf) now and I see how my implementations are off. I will try to fix them.
+
+
+
+## Extra Info
 As an experiment I am using GitHub Copilot whenever possible

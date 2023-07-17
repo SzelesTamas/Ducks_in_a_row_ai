@@ -46,8 +46,7 @@ class Node:
         self.visitCount = 0
         self.win, self.policy = self.rollout()
         if self.endNode:
-            self.win = 1
-            self.value = 1
+            self.win = -1
 
     def addChild(self, child):
         """Adds a new child to the children.
@@ -114,7 +113,7 @@ class Node:
 
         # encourage immediate wins
         if self.endNode:
-            return float(100000)
+            return self.win / self.visitCount
 
         par = self.parent
         if par == None:
@@ -157,14 +156,20 @@ class Node:
 
         # sample the next node to visit based on it's UCT value
         ucts = []
+        maxUct = -1
         nextNode = None
         for move in self.validMoves:
             if self.children[move] is not None:
-                ucts.append(self.children[move].getUCT())
-        ucts = np.array(ucts)
-        ucts /= np.sum(ucts)
+                temp = self.children[move].getUCT()
+                maxUct = max(maxUct, temp)
+                ucts.append(temp)
         if len(ucts) == 0:
             return self
+        ucts = np.array(ucts)
+        maxUct += min(ucts)
+        ucts += min(ucts)
+        ucts = maxUct - ucts
+        ucts /= np.sum(ucts)
         # sample the next node to visit based on it's UCT value
         ind = int(np.random.choice(np.arange(len(ucts)), size=1, p=ucts)[0])
         nextNode = self.children[self.validMoves[ind]]
@@ -187,9 +192,6 @@ class Node:
             if winner == 0:
                 print("Error: No moves left but no winner")
                 print(self.state)
-            else:
-                self.visitCount += 1
-                self.win = 1 if winner == self.player else 0
             return None
         moveIndex = np.random.choice(moves)
 
@@ -208,33 +210,23 @@ class Node:
         self.addChild(child)
         return child
 
-    def calculateWinAndVisit(self):
-        """Calculates the win and visit of the current node from the child nodes.
-        If there are no child nodes it will do nothing.
+    def backpropagate(self, extraWin, player):
+        """Recalculates the win and visit in the ancestors of the node.
+
+        Args:
+            extraWin (float): The extra win to add to the node.
+            player (int): The player that made the move that lead to the node.
         """
-        if self.endNode:
-            self.visitCount += 1
+        
+        if(self.player == player):
+            self.win += extraWin
         else:
-            newVisit = 0
-            hasChild = False
-            newWin = 0
-            for move in self.validMoves:
-                if self.children[move] is not None:
-                    hasChild = True
-                    newVisit += self.children[move].visitCount
-                    newWin += self.children[move].win * self.policy[move]
-
-            if hasChild:
-                # self.win = newWin
-                self.visitCount = newVisit
-            else:
-                self.visitCount += 1
-
-    def backpropagate(self):
-        """Recalculates the win and visit in the ancestors of the node."""
-        self.calculateWinAndVisit()
+            self.win += -extraWin
+        
+        self.visitCount += 1
+        
         if self.parent is not None:
-            self.parent.backpropagate()
+            self.parent.backpropagate(extraWin, player)
 
     def expandTree(self):
         """Expands the tree by running a full MCTS simulation(selection, expansion, rollout, backpropagation).
@@ -246,13 +238,15 @@ class Node:
         if toExpand is None:
             print("No node to expand")
             return
-        newChild = (
-            toExpand.expand()
-        )  # on the creation of the node the constructor also does the rollout phase
+        newChild = toExpand.expand()
+        # on the creation of the node the constructor also does the rollout phase
+        
+        # we are at an end node
         if newChild is None:
-            toExpand.backpropagate()
+            toExpand.backpropagate(1 if Board.getWinner(toExpand.state) == toExpand.player else -1, toExpand.player)
             return
-        newChild.backpropagate()
+        if(newChild.parent is not None):
+            newChild.parent.backpropagate(newChild.win, newChild.player)
 
     def getMove(self, state, player):
         """Returns a move index for a state. The move is sampled randomly based on the MCTS tree visit count because it should have a good value.

@@ -109,7 +109,7 @@ class GameManager:
 
 
 if __name__ == "__main__":
-    modelPath = "models/v2"
+    modelPath = "models/v10"
     valueNetworkPath = os.path.join(modelPath, "valueNetwork.pt")
     policyNetworkPath = os.path.join(modelPath, "policyNetwork.pt")
 
@@ -117,6 +117,7 @@ if __name__ == "__main__":
         simulationCount=300,
         policyNetwork=PolicyNetwork(policyNetworkPath),
         valueNetwork=ValueNetwork(valueNetworkPath),
+        explorationConstant=3,
     )
     gameManager = GameManager(maxGameLength=50, verbose=True)
     games = gameManager.testAgents(100, agent)

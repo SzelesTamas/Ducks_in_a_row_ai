@@ -163,7 +163,7 @@ class SelfPlayGameManager:
         )
         self.replayBuffer.addData(
             Board.getStateForPlayer(history[-1][0], Board.getNextPlayer(winner)),
-            0,
+            -1,
             temp,
         )
 
@@ -175,9 +175,9 @@ class SelfPlayGameManager:
             state, onTurn, move, visits = history[i]
 
             if onTurn == winner:
-                reward = 0.5 + (self.discountFactor ** (len(history) - i - 1)) / 2
+                reward = (self.discountFactor ** (len(history) - i - 1))
             else:
-                reward = 0.5 - (self.discountFactor ** (len(history) - i - 1)) / 2
+                reward = -(self.discountFactor ** (len(history) - i - 1))
 
             self.replayBuffer.addData(
                 Board.getStateForPlayer(state, onTurn), reward, visits
@@ -247,33 +247,41 @@ class SelfPlayTrainer:
         self,
         savePath,
         sourcePath=None,
+        policyHiddenLayers=[64, 64],
+        valueHiddenLayers=[64, 64],
         simulationCount=100,
         maxGameLength=30,
         trainAfter=5,
+        saveAfterEpisode=5,
         batchSize=32,
         bufferSize=100000,
         n_epochs=10,
         explorationConstant=1.4,
+        discountFactor=0.99,
     ):
         """Initializes the SelfPlayTrainer. Both the paths should be to a directory, which should contain a file named "valueNetwork.pt" and a file named "policyNetwork.pt".
 
         Args:
             savePath (str): The path to save the trained agent to.
             sourcePath (str, optional): The path to load the agent from. Defaults to None.
+            policyHiddenLayers (list, optional): The hidden layers to use for the policy network if no source is defined. Defaults to [64, 64].
+            valueHiddenLayers (list, optional): The hidden layers to use for the value network if no source is defined. Defaults to [64, 64].
             simulationCount (int, optional): The number of simulations to run for each move. Defaults to 100.
             maxGameLength (int, optional): The maximum length of a game. Defaults to 30.
             trainAfter (int, optional): The number of games to play before training. Defaults to 5.
+            saveAfterEpisode (int, optional): The number of episodes to play before saving the agent. Defaults to 5.
             batchSize (int, optional): The batch size to use for training. Defaults to 32.
             bufferSize (int, optional): The size of the replay buffer. Defaults to 100000.
             n_epochs (int, optional): The number of epochs to train for. Defaults to 10.
             explorationConstant (float, optional): The exploration constant to use for MCTS. Defaults to 1.4.
+            discountFactor (float, optional): The discount factor to use for the rewards. Defaults to 0.99.
         """
 
         self.savePath = savePath
         # Initialize the neural networks
         if sourcePath is None:
-            self.valueNetwork = ValueNetwork()
-            self.policyNetwork = PolicyNetwork()
+            self.valueNetwork = ValueNetwork(hiddenSizes=valueHiddenLayers)
+            self.policyNetwork = PolicyNetwork(hiddenSizes=policyHiddenLayers)
         else:
             policyPath = os.path.join(sourcePath, "policyNetwork.pt")
             valuePath = os.path.join(sourcePath, "valueNetwork.pt")
@@ -289,18 +297,21 @@ class SelfPlayTrainer:
         self.simulationCount = simulationCount
         self.maxGameLength = maxGameLength
         self.trainAfter = trainAfter
+        self.saveAfterEpisode = saveAfterEpisode
         self.batchSize = batchSize
         self.bufferSize = bufferSize
         self.n_epochs = n_epochs
         self.explorationConstant = explorationConstant
+        self.discountFactor = discountFactor
 
         # Initialize the game manager
         self.gameManager = SelfPlayGameManager(
             self.maxGameLength,
             self.batchSize,
             self.bufferSize,
-            addPerGame=10,
+            addPerGame=100,
             verbose=True,
+            discountFactor=self.discountFactor,
         )
 
     def trainForEpisodes(self, numEpisodes):
@@ -309,8 +320,8 @@ class SelfPlayTrainer:
         Args:
             numEpisodes (int): The number of episodes to train for.
         """
-        for i in range(numEpisodes):
-            print(f"Episode {i+1}/{numEpisodes}")
+        for i in range(1, numEpisodes+1):
+            print(f"Episode {i}/{numEpisodes}")
             print("Playing games...")
             self.gameManager.playGames(
                 Agent(
@@ -333,16 +344,18 @@ class SelfPlayTrainer:
             )
             self.train()
             # self.gameManager.clearBuffer()
-            print("Saving...")
-            self.saveAgent()
+            if(i % self.saveAfterEpisode == 0):
+                print("Saving...")
+                self.saveAgent()
             print("--------------------")
 
     def train(self):
         """Trains the agent using the data in the replay buffer of the game manager."""
         policyOptimizer = torch.optim.Adam(self.policyNetwork.parameters(), lr=0.001)
         valueOptimizer = torch.optim.Adam(self.valueNetwork.parameters(), lr=0.001)
-        valueLoss = nn.MSELoss()
-        policyLoss = nn.CrossEntropyLoss()
+        valueLoss = nn.MSELoss().to(self.valueNetwork.device)
+        policyLoss = nn.CrossEntropyLoss().to(self.policyNetwork.device)
+        #policyLoss = nn.MSELoss() # it's actually cross entropy loss but I wanted to try this out
 
         # keep track of the moving average of the losses
         valueLosses = []
@@ -364,8 +377,8 @@ class SelfPlayTrainer:
                 policyPreds = self.policyNetwork(states)
                 targetValues = torch.tensor(
                     targetValues, dtype=torch.float32
-                ).unsqueeze(1)
-                targetPolicies = torch.tensor(targetPolicies, dtype=torch.float32)
+                ).unsqueeze(1).to(self.valueNetwork.device)
+                targetPolicies = torch.tensor(targetPolicies, dtype=torch.float32).to(self.policyNetwork.device)
 
                 vLoss = valueLoss(valuePreds, targetValues)
                 pLoss = policyLoss(policyPreds, targetPolicies)
@@ -385,11 +398,12 @@ class SelfPlayTrainer:
                 f"Value loss: {sum(valueLosses)/len(valueLosses)} Policy loss: {sum(policyLosses)/len(policyLosses)}"
             )
 
-    def saveAgent(self, testGames=25):
+    def saveAgent(self, testGames=20, addToBuffer=True):
         """Compares the agent with the current best agent and saves it if it is better.
 
         Args:
             testGames (int, optional): The number of games to play to test the agent. Defaults to 25.
+            addToBuffer (bool, optional): Whether to add the games to the replay buffer. Defaults to False.
         """
 
         # check if the directory exists
@@ -411,16 +425,16 @@ class SelfPlayTrainer:
 
             # play games between the two agents as the newly trained agent is the first player
             games1 = self.gameManager.playGames(
-                Agent(self.simulationCount, self.policyNetwork, self.valueNetwork),
-                Agent(self.simulationCount, savedPolicyNetwork, savedValueNetwork),
+                Agent(self.simulationCount, self.policyNetwork, self.valueNetwork, self.explorationConstant),
+                Agent(self.simulationCount, savedPolicyNetwork, savedValueNetwork, self.explorationConstant),
                 testGames,
-                True,
+                addToBuffer,
             )
             games2 = self.gameManager.playGames(
-                Agent(self.simulationCount, savedPolicyNetwork, savedValueNetwork),
-                Agent(self.simulationCount, self.policyNetwork, self.valueNetwork),
+                Agent(self.simulationCount, savedPolicyNetwork, savedValueNetwork, self.explorationConstant),
+                Agent(self.simulationCount, self.policyNetwork, self.valueNetwork, self.explorationConstant),
                 testGames,
-                True,
+                addToBuffer,
             )
 
             games = [games1[0] + games2[1], games1[1] + games2[0]]
@@ -437,13 +451,18 @@ class SelfPlayTrainer:
 
 if __name__ == "__main__":
     trainer = SelfPlayTrainer(
-        "models/v4",
-        sourcePath=None,
-        simulationCount=500,
+        savePath="models/v11",
+        sourcePath="models/v11",
+        policyHiddenLayers=[60, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500],
+        valueHiddenLayers=[100, 100, 100, 100, 100, 100, 100],
+        simulationCount=50,
         maxGameLength=20,
-        trainAfter=30,
-        batchSize=100,
-        bufferSize=5000,
-        n_epochs=30,
+        trainAfter=5,
+        saveAfterEpisode = 5,
+        batchSize=40,
+        bufferSize=500,
+        n_epochs=50,
+        explorationConstant=1.4,
+        discountFactor=0.99,
     )
     trainer.trainForEpisodes(1000)

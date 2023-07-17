@@ -425,14 +425,14 @@ class SelfPlayTrainer:
                 print("The new model was not better. Not saving it.")
 
 
-torch.manual_seed(0)
-random.seed(0)
-np.random.seed(0)
+#torch.manual_seed(0)
+#random.seed(0)
+#np.random.seed(0)
 simulationCount = 300
-trainAfter = 100
-n_epochs = 100
-savePath = "models/v1"
+trainAfter = 50
+n_epochs = 200
+savePath = "models/v2"
 trainer = SelfPlayTrainer(
-    savePath=savePath, sourcePath=savePath, simulationCount=simulationCount, trainAfter=trainAfter, n_epochs=n_epochs
+    savePath=savePath, sourcePath=None, simulationCount=simulationCount, trainAfter=trainAfter, n_epochs=n_epochs
 )
 trainer.trainForEpisodes(100)
