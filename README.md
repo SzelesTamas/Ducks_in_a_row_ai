@@ -1,6 +1,6 @@
 # Ducks in a row ai
 
-In this repository I will try to make a "AI" for playing the game Ducks in a row. 
+In this repository I will try to make an "AI" for playing the game Ducks in a row. 
 
 ## Version 1
 In this version I tried to play the game with just one policy neural network and a messy implementation.
